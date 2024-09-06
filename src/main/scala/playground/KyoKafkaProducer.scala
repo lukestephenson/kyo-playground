@@ -22,90 +22,90 @@ object KyoKafkaProducer {
     ProducerConfig.BATCH_SIZE_CONFIG -> "16384"
   ))
 
-  val producerBuilder: KafkaProducer[String, String] < (Envs[KyoProducerConfig] & IOs & Consoles) = for {
-    _ <- Consoles.println("instantiating kafka producer")
-    producerConfig <- Envs.get[KyoProducerConfig]
+  val producerBuilder: KafkaProducer[String, String] < (Env[KyoProducerConfig] & IO) = for {
+    _ <- Console.println("instantiating kafka producer")
+    producerConfig <- Env.get[KyoProducerConfig]
     javaProps = producerConfig.config.asJava
-    p <- IOs(new KafkaProducer[String, String](javaProps, new StringSerializer(), new StringSerializer()))
+    p <- IO(new KafkaProducer[String, String](javaProps, new StringSerializer(), new StringSerializer()))
   } yield p
 
-  /**
-   * Will publish until blocked on the client side
-   *
-   * Return a promise
-   */
-  def publishSecondAttempt(kP: KafkaProducer[String, String], message: String): Fiber[Try[RecordMetadata]] < IOs = {
-    val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
-    //    println(s"sending $message")
+  // /**
+  //  * Will publish until blocked on the client side
+  //  *
+  //  * Return a promise
+  //  */
+  // def publishSecondAttempt(kP: KafkaProducer[String, String], message: String): Fiber[Throwable, RecordMetadata] < IO = {
+  //   val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
+  //   //    println(s"sending $message")
 
-    for {
-      promise <- IOs(scala.concurrent.Promise[Try[RecordMetadata]]())
-      _ <- IOs(kP.send(producerRecord, new Callback {
-        override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-          // TODO don't use Try, but use kyo attempt for lower overhead
-          if (exception != null) {
-            //            println(s"got failure callback - $message")
-            promise.success(Failure(exception))
-          } else {
-            //                        println(s"got success callback - $message")
-            promise.success(Success(metadata))
-          }
-        }
-      }))
-      serverAck <- Fibers.fromFutureFiber(promise.future)
-    } yield serverAck
-  }
+  //   for {
+  //     promise <- IO(scala.concurrent.Promise[Try[RecordMetadata]]())
+  //     _ <- IO(kP.send(producerRecord, new Callback {
+  //       override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
+  //         // TODO don't use Try, but use kyo attempt for lower overhead
+  //         if (exception != null) {
+  //           //            println(s"got failure callback - $message")
+  //           promise.success(Failure(exception))
+  //         } else {
+  //           //                        println(s"got success callback - $message")
+  //           promise.success(Success(metadata))
+  //         }
+  //       }
+  //     }))
+  //     serverAck <- Async.fromFutureFiber(promise.future)
+  //   } yield serverAck
+  // }
 
-  def publish(kP: KafkaProducer[String, String], message: String): Promise[Try[RecordMetadata]] < IOs = {
-    val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
-    //    println(s"sending $message")
-    for {
-      serverAck <- Fibers.initPromise[Try[RecordMetadata]]
-      - <- IOs(kP.send(producerRecord, new Callback {
-        override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-          // TODO don't use Try, but use kyo attempt for lower overhead
-          if (exception != null) {
-            IOs.runLazy(serverAck.complete(Failure(exception)))
-          } else {
-            //            println("got success callback - $message")
-            IOs.runLazy(serverAck.complete(Success(metadata)))
-          }
-        }
-      }))
-    } yield serverAck
-  }
+  // def publish(kP: KafkaProducer[String, String], message: String): Promise[Try[RecordMetadata]] < IO = {
+  //   val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
+  //   //    println(s"sending $message")
+  //   for {
+  //     serverAck <- Fibers.initPromise[Try[RecordMetadata]]
+  //     - <- IO(kP.send(producerRecord, new Callback {
+  //       override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
+  //         // TODO don't use Try, but use kyo attempt for lower overhead
+  //         if (exception != null) {
+  //           IO.runLazy(serverAck.complete(Failure(exception)))
+  //         } else {
+  //           //            println("got success callback - $message")
+  //           IO.runLazy(serverAck.complete(Success(metadata)))
+  //         }
+  //       }
+  //     }))
+  //   } yield serverAck
+  // }
 
-  def publishWithAttempt(kP: KafkaProducer[String, String], message: String): Promise[RecordMetadata < Aborts[Exception]] < IOs = {
-    val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
-    //    println(s"sending $message")
-    for {
-      serverAck <- Fibers.initPromise[RecordMetadata < Aborts[Exception]]
-      - <- IOs(kP.send(producerRecord, new Callback {
-        override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-          // TODO don't use Try, but use kyo attempt for lower overhead
-          if (exception != null) {
-            IOs.run(serverAck.complete(Aborts.fail(exception)))
-          } else {
-            //            println("got success callback - $message")
-            IOs.run(serverAck.complete(metadata))
-          }
-        }
-      }))
-    } yield serverAck
-  }
+  // def publishWithAttempt(kP: KafkaProducer[String, String], message: String): Promise[RecordMetadata < Abort[Exception]] < IO = {
+  //   val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
+  //   //    println(s"sending $message")
+  //   for {
+  //     serverAck <- Fibers.initPromise[RecordMetadata < Abort[Exception]]
+  //     - <- IO(kP.send(producerRecord, new Callback {
+  //       override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
+  //         // TODO don't use Try, but use kyo attempt for lower overhead
+  //         if (exception != null) {
+  //           IO.run(serverAck.complete(Abort.fail(exception)))
+  //         } else {
+  //           //            println("got success callback - $message")
+  //           IO.run(serverAck.complete(metadata))
+  //         }
+  //       }
+  //     }))
+  //   } yield serverAck
+  // }
 
 //  case class ChunkResult()
 
-  case class BrokerAck(recordMetadata: Seq[RecordMetadata < Aborts[Throwable]] < Fibers)
+  case class BrokerAck(recordMetadata: Chunk[Result[Throwable, RecordMetadata]] < Async)
 
-  def publishChunk[K, V](chunk: IndexedSeq[ProducerRecord[K, V]], producer: KafkaProducer[K, V]): BrokerAck < IOs = {
+  def publishChunk[K, V](chunk: Chunk[ProducerRecord[K, V]], producer: KafkaProducer[K, V]): BrokerAck < IO = {
     for {
-      serverAck <- Fibers.initPromise[Seq[RecordMetadata < Aborts[Throwable]]]
+      serverAck <- Promise.init[Nothing, Chunk.Indexed[Result[Throwable, RecordMetadata]]]
 
-      _ <- IOs {
+      _ <- IO {
         val length = chunk.size
         try {
-          val res = new Array[RecordMetadata < Aborts[Exception]](length)
+          val res = new Array[Result[Throwable, RecordMetadata]](length)
           val count = new JAtomicLong(0)
           var index = 0
           chunk.foreach { record =>
@@ -113,14 +113,14 @@ object KyoKafkaProducer {
             index = index + 1
             producer.send(record, (metadata: RecordMetadata, err: Exception) =>
               val result = if (err != null) {
-                Aborts.fail(err)
+                Result.Fail(err)
               } else {
-                metadata
+                Result.Success(metadata)
               }
               res(resultIndex) = result
 
               if (count.incrementAndGet == length) {
-                IOs.run(serverAck.complete(res))
+                IO.run(serverAck.complete(Result.Success(Chunk.from(res))))
               }
             )
 
@@ -128,27 +128,27 @@ object KyoKafkaProducer {
           }
         } catch {
           case NonFatal(err) =>
-            IOs.run(serverAck.complete(List.fill(length)(Aborts.fail(err))))
+            IO.run(serverAck.complete(Result.Success(Chunk.fill(length)(Result.fail(err)).toIndexed)))
         }
       }
     } yield BrokerAck(serverAck.get)
   }
 
-  def publishNoAck(kP: KafkaProducer[String, String], message: String): Unit < IOs = {
-    val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
-    //    println(s"sending $message")
-    for {
-      //      serverAck <- Fibers.initPromise[Try[RecordMetadata]]
-      - <- IOs(kP.send(producerRecord, new Callback {
-        override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-          // TODO don't use Try, but use kyo attempt
-          ()
-        }
-      }))
-    } yield ()
-  }
+  // def publishNoAck(kP: KafkaProducer[String, String], message: String): Unit < IO = {
+  //   val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
+  //   //    println(s"sending $message")
+  //   for {
+  //     //      serverAck <- Fibers.initPromise[Try[RecordMetadata]]
+  //     - <- IO(kP.send(producerRecord, new Callback {
+  //       override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
+  //         // TODO don't use Try, but use kyo attempt
+  //         ()
+  //       }
+  //     }))
+  //   } yield ()
+  // }
 
-//  def publishAll(kp: KafkaProducer[String, String]): Unit < (Envs[KyoProducerConfig] & IOs & Fibers) = {
+//  def publishAll(kp: KafkaProducer[String, String]): Unit < (Envs[KyoProducerConfig] & IO & Fibers) = {
 //    val range: Range.Inclusive = (1 to NumMessages)
 //    val program = for {
 //      _ <- Streams.initChunk(Chunks.initSeq(range))
@@ -164,29 +164,29 @@ object KyoKafkaProducer {
 //    program
 //  }
 
-  def publishAll3(kp: KafkaProducer[String, String]): Seq[_] < (Envs[KyoProducerConfig] & IOs & Fibers) = {
-    // TODO, note this doesn't wait for completion
-    val seed: Int < Choices = Choices.get((1 to NumMessages))
+  // def publishAll3(kp: KafkaProducer[String, String]): Seq[_] < (Envs[KyoProducerConfig] & IO & Fibers) = {
+  //   // TODO, note this doesn't wait for completion
+  //   val seed: Int < Choice = Choice.get((1 to NumMessages))
 
-    val result: Promise[_] < (Choices & IOs) = seed.map(i => publishWithAttempt(kp, s"kyo - $i"))
+  //   val result: Promise[_] < (Choice & IO) = seed.map(i => publishWithAttempt(kp, s"kyo - $i"))
 
-    Choices.run(result)
-  }
+  //   Choice.run(result)
+  // }
 
-  def publishAll4(kp: KafkaProducer[String, String]): Unit < Fibers = {
+  def publishAll4(kp: KafkaProducer[String, String]): Unit < IO = {
     val chunkSize = 10000
-//    import Flat.unsafe.bypass[Promise[RecordMetadata < Aborts[Throwable]]]
-    Streams.initSeq(1 to (NumMessages / chunkSize))
-      .transform { index =>
+//    import Flat.unsafe.bypass[Promise[RecordMetadata < Abort[Throwable]]]
+    Stream.init(1 to (NumMessages / chunkSize))
+      .map { index =>
         val baseIndex= index * chunkSize
         val producerRecords: IndexedSeq[ProducerRecord[String, String]] = (0 to chunkSize).map { chunkIndex =>
           new ProducerRecord[String, String]("escape.heartbeat", s"kyo ${baseIndex + chunkIndex}")
         }
-        val result: BrokerAck < IOs = publishChunk(producerRecords, kp)
+        val result: BrokerAck < IO = publishChunk(Chunk.from(producerRecords), kp)
         result
       }
-      .buffer(2048) // Note at this point the messages are sent, and we are just waiting on promises to complete
-      .transform { brokerAck =>
+      // .buffer(2048) // Note at this point the messages are sent, and we are just waiting on promises to complete
+      .map { brokerAck =>
         for {
           chunkRecordOrError <- brokerAck.recordMetadata
           // ignoring errors for now
@@ -196,13 +196,13 @@ object KyoKafkaProducer {
   }
 
   def main(args: Array[String]): Unit = {
-    //    val program: Unit < (IOs & Fibers) = publishAll())
+    //    val program: Unit < (IO & Fibers) = publishAll())
     def timedProgram(producer: KafkaProducer[String, String]) = for {
-      _ <- Consoles.println("starting kafka publishing")
-      start <- Clocks.now
+      _ <- Console.println("starting kafka publishing")
+      start <- Clock.now
       _ <- publishAll4(producer)
-      end <- Clocks.now
-      _ <- Consoles.println(s"Took ${end.toEpochMilli() - start.toEpochMilli()}ms to publish $NumMessages messages")
+      end <- Clock.now
+      _ <- Console.println(s"Took ${end.toEpochMilli() - start.toEpochMilli()}ms to publish $NumMessages messages")
     } yield ()
 
     val programLoop = for {
@@ -212,6 +212,6 @@ object KyoKafkaProducer {
       _ <- timedProgram(producer)
       _ <- timedProgram(producer)
     } yield ()
-    KyoApp.run(Envs.run(config)(programLoop))
+    KyoApp.run(Env.run(config)(programLoop))
   }
 }

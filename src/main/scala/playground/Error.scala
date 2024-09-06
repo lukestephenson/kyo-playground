@@ -1,52 +1,32 @@
 package playground
 
 import kyo.*
-import kyo.IOs
 
 object Error {
 
-  val a: Int = 1
-  val b: Int < Any = 1
-  val b1: Int = 1.pure
-  val c: Int < Options = 1
-  val c1: Option[Int] < Any = Options.run(c)
-  val c2: Option[Int] = c1.pure
+  private def sendEmail(email: String, body: String): Unit < IO = println(s"hello $email")
 
-  def sendEmail(email: String, body: String): Unit < IOs = println(s"hello $email")
+  private val maybeEmail: Maybe[String] = Maybe.Defined("luke@gmail.com")
 
-  val maybeEmail: String < Options = "luke@gmail.com"
-
-  val result1: Unit < (Options & IOs) = maybeEmail.map { email =>
-    val body = s"Sent to $email"
-    sendEmail(email, body)
+  maybeEmail match{
+    case Maybe.Defined(email) =>
+      val body = s"Sent to $email"
+      sendEmail(email, body)
+    case Maybe.Empty => ()
   }
-
-  val result2: Unit < (Options & IOs) = maybeEmail.flatMap { email =>
-    val body = s"Sent to $email"
-    sendEmail(email, body)
-  }
-
-
-  for {
-    email <- maybeEmail
-    body = s"Sent to $email"
-    _ <- sendEmail(email, body)
-  } yield ()
-
-
-
-  def program: Int < (Consoles & Aborts[String]) = {
+  
+  def program: Int < (IO & Abort[String]) = {
     for {
-      _ <- Consoles.println("start")
-      value <- if (true) 5 else Aborts.fail("failed!")
-      _ <- Consoles.println("end")
+      _ <- Console.println("start")
+      value <- if (true) Abort.get(Right(5)) else Abort.fail("failed!")
+      _ <- Console.println("end")
     } yield value
   }
 
   def main(args: Array[String]): Unit = {
     val progVal = program
-    val handleErrors: Either[String, Int] < kyo.Consoles = Aborts.run[String](progVal)
-    val result: Either[String, Int] = KyoApp.run(handleErrors)
+    val handleErrors: Result[String, Int] < IO = Abort.run[String](progVal)
+    val result: Result[String, Int] = KyoApp.run(handleErrors)
 
     // outside kyo app
     println(result)

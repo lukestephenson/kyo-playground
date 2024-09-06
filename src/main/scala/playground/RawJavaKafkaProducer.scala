@@ -34,7 +34,7 @@ object RawJavaKafkaProducer {
   }
 
   def main(args: Array[String]): Unit = {
-//    val program: Unit < (IOs & Fibers) = publishAll())
+//    val program: Unit < (IO & Fibers) = publishAll())
     def timedProgram(): Unit = {
       println("starting kafka publishing")
       val start = System.currentTimeMillis()

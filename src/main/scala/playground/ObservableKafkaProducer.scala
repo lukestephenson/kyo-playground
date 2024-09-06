@@ -64,7 +64,7 @@ object ObservableKafkaProducer extends TaskApp {
   }
 
   override def run(args: List[String]): Task[ExitCode] = {
-    //    val program: Unit < (IOs & Fibers) = publishAll())
+    //    val program: Unit < (IO & Fibers) = publishAll())
     def timedProgram(producer: KafkaProducer[String, String]): Task[Unit] = for {
       _ <- Task(println("starting kafka publishing"))
       start <- Task(System.currentTimeMillis())
