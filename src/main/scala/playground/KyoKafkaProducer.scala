@@ -1,33 +1,33 @@
 package playground
 
 import kyo.*
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
-import org.apache.kafka.common.serialization.StringSerializer
+import lukekafka.producer.{BrokerAck, Producer}
+import org.apache.kafka.clients.producer.{ProducerConfig, ProducerRecord, RecordMetadata}
 
-import scala.jdk.CollectionConverters
-import scala.jdk.CollectionConverters.MapHasAsJava
-import scala.util.{Failure, Success, Try}
-import scala.concurrent.duration.*
-import scala.jdk.javaapi.FutureConverters
-import java.util.concurrent.atomic.AtomicLong as JAtomicLong
-import scala.util.control.NonFatal
+case class KyoProducerConfig(config: Map[String, String])
 
-case class KyoProducerConfig(config: Map[String, Object])
+object KyoProducerConfig {
+  // TODO sensible producer defaults
+  val Defaults = KyoProducerConfig(Map(
+  ))
+
+}
 
 object KyoKafkaProducer {
-  val NumMessages = 10_000_000
+  case object Done
+  val chunkSize = 1 // 10000
+  val NumMessages = 10 // 10_000_000
   val config = KyoProducerConfig(Map(
     ProducerConfig.BOOTSTRAP_SERVERS_CONFIG -> "kafka.docker:9092",
     ProducerConfig.LINGER_MS_CONFIG -> "100",
     ProducerConfig.BATCH_SIZE_CONFIG -> "16384"
   ))
 
-  val producerBuilder: KafkaProducer[String, String] < (Env[KyoProducerConfig] & IO) = for {
+  val producerBuilder: Producer < (Env[KyoProducerConfig] & Resource & IO) = for {
     _ <- Console.println("instantiating kafka producer")
     producerConfig <- Env.get[KyoProducerConfig]
-    javaProps = producerConfig.config.asJava
-    p <- IO(new KafkaProducer[String, String](javaProps, new StringSerializer(), new StringSerializer()))
-  } yield p
+    errorOrProducer <- Producer.makeDieInvalidConfig(producerConfig.config)
+  } yield errorOrProducer
 
   // /**
   //  * Will publish until blocked on the client side
@@ -96,44 +96,65 @@ object KyoKafkaProducer {
 
 //  case class ChunkResult()
 
-  case class BrokerAck(recordMetadata: Chunk[Result[Throwable, RecordMetadata]] < Async)
-
-  def publishChunk[K, V](chunk: Chunk[ProducerRecord[K, V]], producer: KafkaProducer[K, V]): BrokerAck < IO = {
-    for {
-      serverAck <- Promise.init[Nothing, Chunk.Indexed[Result[Throwable, RecordMetadata]]]
-
-      _ <- IO {
-        val length = chunk.size
-        try {
-          val res = new Array[Result[Throwable, RecordMetadata]](length)
-          val count = new JAtomicLong(0)
-          var index = 0
-          chunk.foreach { record =>
-            val resultIndex = index
-            index = index + 1
-            producer.send(record, (metadata: RecordMetadata, err: Exception) =>
-              val result = if (err != null) {
-                Result.Fail(err)
-              } else {
-                Result.Success(metadata)
-              }
-              res(resultIndex) = result
-
-              if (count.incrementAndGet == length) {
-                IO.run(serverAck.complete(Result.Success(Chunk.from(res))))
-              }
-            )
-
-            ()
-          }
-        } catch {
-          case NonFatal(err) =>
-            IO.run(serverAck.complete(Result.Success(Chunk.fill(length)(Result.fail(err)).toIndexed)))
-        }
-      }
-    } yield BrokerAck(serverAck.get)
-  }
-
+//  case class BrokerAck(recordMetadata: Chunk.Indexed[RecordMetadata] < (Async & Abort[Throwable]))
+//  case class BrokerAckWithFailures(recordMetadata: Chunk.Indexed[Result[Throwable, RecordMetadata]] < Async)
+//
+//  def produceChunkAsyncWithFailures[K, V](chunk: Chunk[ProducerRecord[K, V]], producer: KafkaProducer[K, V]): BrokerAckWithFailures < IO = {
+//    for {
+//      serverAck <- Promise.init[Nothing, Chunk.Indexed[Result[Throwable, RecordMetadata]]]
+//
+//      _ <- IO {
+//        val length = chunk.size
+//        try {
+//          val res = new Array[Result[Throwable, RecordMetadata]](length)
+//          val count = new JAtomicLong(0)
+//          var index = 0
+//          chunk.foreach { record =>
+//            val resultIndex = index
+//            index = index + 1
+//            producer.send(record, (metadata: RecordMetadata, err: Exception) =>
+//              val result = if (err != null) {
+//                Result.Fail(err)
+//              } else {
+//                Result.Success(metadata)
+//              }
+//              res(resultIndex) = result
+//
+//              if (count.incrementAndGet == length) {
+//                IO.run(serverAck.complete(Result.Success(Chunk.from(res))))
+//              }
+//            )
+//
+//            ()
+//          }
+//        } catch {
+//          case NonFatal(err) =>
+//            IO.run(serverAck.complete(Result.Success(Chunk.fill(length)(Result.fail(err)).toIndexed)))
+//        }
+//      }
+//    } yield BrokerAckWithFailures(serverAck.get)
+//  }
+//
+//  def produceChunkAsync[K, V](chunk: Chunk[ProducerRecord[K, V]], producer: KafkaProducer[K, V]): BrokerAck < IO = {
+//    produceChunkAsyncWithFailures(chunk, producer).map { brokerAck =>
+//      val errorOrResults = brokerAck.recordMetadata.map { resultChunk =>
+//        val empty: Result[Throwable, Chunk[RecordMetadata]] = Result.Success(Chunk.empty)
+//
+//        // TODO inefficient
+//        resultChunk.foldLeft(empty) { (acc, result) =>
+//          acc.flatMap { accChunk =>
+//            result.map { metadata =>
+//              accChunk.append(metadata)
+//            }
+//          }
+//        } match {
+//          case Result.Fail(err) => Abort.fail(err)
+//          case Result.Success(chunk) => chunk.toIndexed
+//        }
+//      }
+//      BrokerAck(errorOrResults)
+//    }
+//  }
   // def publishNoAck(kP: KafkaProducer[String, String], message: String): Unit < IO = {
   //   val producerRecord = new ProducerRecord[String, String]("escape.heartbeat", message)
   //   //    println(s"sending $message")
@@ -173,31 +194,33 @@ object KyoKafkaProducer {
   //   Choice.run(result)
   // }
 
-  def publishAll4(kp: KafkaProducer[String, String]): Unit < IO = {
-    val chunkSize = 10000
-//    import Flat.unsafe.bypass[Promise[RecordMetadata < Abort[Throwable]]]
-    Stream.init(1 to (NumMessages / chunkSize))
+  def publishAll4(kp: Producer): Done.type < (Async & Abort[Throwable]) = {
+    println("publishAll4.a")
+    val step1: Stream[BrokerAck, IO] = Stream.init(1 to (NumMessages / chunkSize))
       .map { index =>
+        println(s"publishAll4.b - $index")
         val baseIndex= index * chunkSize
-        val producerRecords: IndexedSeq[ProducerRecord[String, String]] = (0 to chunkSize).map { chunkIndex =>
-          new ProducerRecord[String, String]("escape.heartbeat", s"kyo ${baseIndex + chunkIndex}")
+        val producerRecords: IndexedSeq[ProducerRecord[Array[Byte], Array[Byte]]] = (0 to chunkSize).map { chunkIndex =>
+          new ProducerRecord[Array[Byte], Array[Byte]]("escape.heartbeat", s"kyo ${baseIndex + chunkIndex}".getBytes)
         }
-        val result: BrokerAck < IO = publishChunk(Chunk.from(producerRecords), kp)
+        val result: BrokerAck < IO = kp.produceChunkAsync(Chunk.from(producerRecords))
         result
       }
       // .buffer(2048) // Note at this point the messages are sent, and we are just waiting on promises to complete
-      .map { brokerAck =>
-        for {
-          chunkRecordOrError <- brokerAck.recordMetadata
-          // ignoring errors for now
-        } yield ()
-      }
-      .runDiscard
+    val step2: Stream[Chunk.Indexed[RecordMetadata], Async & Abort[Throwable]] = step1.map { brokerAck =>
+//      val foo: Chunk.Indexed[RecordMetadata] < (IO & Abort[Throwable]) = Async.run(brokerAck.recordMetadata)
+//      foo
+      brokerAck.recordMetadata
+    }
+
+    val step3 = step2.runForeach(x => Console.println(s"publishAll4.c - $x")).map(_ => Done)
+
+    step3
   }
 
   def main(args: Array[String]): Unit = {
     //    val program: Unit < (IO & Fibers) = publishAll())
-    def timedProgram(producer: KafkaProducer[String, String]) = for {
+    def timedProgram(producer: Producer) = for {
       _ <- Console.println("starting kafka publishing")
       start <- Clock.now
       _ <- publishAll4(producer)

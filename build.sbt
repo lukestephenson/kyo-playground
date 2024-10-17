@@ -1,3 +1,4 @@
+
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 ThisBuild / scalaVersion := "3.5.0"
@@ -11,6 +12,7 @@ lazy val root = (project in file("."))
 libraryDependencies += "io.monix" %% "monix" % "3.4.1"
 
 libraryDependencies += "io.getkyo" %% "kyo-core" % kyoVersion
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.6"
 //libraryDependencies += "io.getkyo" %% "kyo-direct" % kyoVersion
 //libraryDependencies += "io.getkyo" %% "kyo-cache" % kyoVersion
 //libraryDependencies += "io.getkyo" %% "kyo-stats-otel" % kyoVersion

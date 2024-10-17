@@ -9,3 +9,7 @@ target/
 .bsp
 .idea
 .metals
+project/project
+project/target
+.vscode/
+.bloop/
