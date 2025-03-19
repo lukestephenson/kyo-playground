@@ -1,41 +1,42 @@
 package playground
 
 import kyo.*
+import kyo.AllowUnsafe.embrace.danger
 
 object ListAndError {
   def main(args: Array[String]): Unit = {
     val list = (1 to 3).toList
-    val program: Int < (Choices & Consoles & Aborts[String]) = {
-      Choices.eval(list) { i =>
+    val program: Int < (Choice & IO & Abort[String]) = {
+      Choice.eval(list) { i =>
         for {
-          _ <- Consoles.println(s"got $i")
-          _ <- if (i == 2) Aborts.fail("unexpected 2") else ()
-          _ <- Consoles.println(s"after $i")
+          _ <- Console.println(s"got $i")
+          _ <- if (i == 2) Abort.fail("unexpected 2") else Abort.get(Right(()))
+          _ <- Console.println(s"after $i")
         } yield i * 2
       }
     }
 
-    println("Eliminate Aborts first")
+    println("Eliminate Abort first")
     {
-      val noErrors: Unit < (Choices & Consoles) = Aborts.run[String](program).flatMap{ (result: Either[String, Int]) =>
-        Consoles.println(s"Aborts result is $result") }
+      val noErrors: Unit < (Choice & IO) = Abort.run[String](program).flatMap{ (result: Result[String, Int]) =>
+        Console.println(s"Abort result is $result") }
 
-      val choiceResult = Choices.run(noErrors)
+      val choiceResult = Choice.run(noErrors)
 
-      println(KyoApp.run(choiceResult))
+      println(KyoApp.Unsafe.run(choiceResult))
     }
     println()
     println()
     println()
     println()
-    println("Eliminate Choices first")
+    println("Eliminate Choice first")
     {
-      val choiceResult: Seq[Int] < (Consoles & Aborts[String]) = Choices.run(program)
+      val choiceResult: Seq[Int] < (IO & Abort[String]) = Choice.run(program)
 
-      val noErrors: Unit < Consoles = Aborts.run[String](choiceResult).flatMap { (result: Either[String, Seq[Int]]) =>
-        Consoles.println(s"Aborts result is $result") }
+      val noErrors: Unit < IO = Abort.run[String](choiceResult).flatMap { (result: Result[String, Seq[Int]]) =>
+        Console.println(s"Abort result is $result") }
 
-      println(KyoApp.run(noErrors))
+      println(KyoApp.Unsafe.run(noErrors))
     }
     ()
   }

@@ -3,16 +3,13 @@ package playground
 import cats.effect.ExitCode
 import monix.eval.{Task, TaskApp}
 import monix.reactive.{Observable, OverflowStrategy}
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.*
 import org.apache.kafka.common.serialization.StringSerializer
 
-import scala.concurrent.Promise
+import scala.concurrent.{Promise, blocking}
 import scala.jdk.CollectionConverters
 import scala.jdk.CollectionConverters.MapHasAsJava
-import scala.util.{Failure, Success, Try}
-import scala.concurrent.duration.*
-import scala.jdk.javaapi.FutureConverters
-import scala.concurrent.{Promise, blocking}
+import scala.util.{Failure, Success}
 
 object ObservableKafkaProducer extends TaskApp {
   val NumMessages = 10_000_000
@@ -64,7 +61,7 @@ object ObservableKafkaProducer extends TaskApp {
   }
 
   override def run(args: List[String]): Task[ExitCode] = {
-    //    val program: Unit < (IOs & Fibers) = publishAll())
+    //    val program: Unit < (IO & Fibers) = publishAll())
     def timedProgram(producer: KafkaProducer[String, String]): Task[Unit] = for {
       _ <- Task(println("starting kafka publishing"))
       start <- Task(System.currentTimeMillis())

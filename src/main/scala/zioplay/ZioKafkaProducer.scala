@@ -1,18 +1,12 @@
 package zioplay
 
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
-import org.apache.kafka.common.serialization.StringSerializer
-import zio.{Clock, Console, RLayer, Task, ZIO, ZIOAppDefault}
+import org.apache.kafka.clients.producer.*
 import zio.kafka.producer.{Producer, ProducerSettings}
 import zio.stream.ZStream
-import zio._
+import zio.{Clock, Console, RLayer, Task, ZIO, ZIOAppDefault, *}
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
-import scala.jdk.CollectionConverters
-import scala.jdk.CollectionConverters.MapHasAsJava
-import scala.util.{Failure, Success, Try}
-import scala.concurrent.duration.*
 
 case class KyoProducerConfig(config: Map[String, Object])
 
