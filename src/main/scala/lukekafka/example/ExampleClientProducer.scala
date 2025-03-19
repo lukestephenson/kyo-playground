@@ -4,12 +4,12 @@ import kyo.*
 import lukekafka.producer.{BrokerAck, Producer}
 import org.apache.kafka.clients.producer.{ProducerConfig, ProducerRecord, RecordMetadata}
 
-object ExampleClientProducer {
+object ExampleClientProducer extends KyoApp {
   val chunkSize = 10000
   val NumMessages = 10_000_000
 
   val producerConfig = Map(
-    ProducerConfig.BOOTSTRAP_SERVERS_CONFIG -> "kafka.docker:9092",
+    ProducerConfig.BOOTSTRAP_SERVERS_CONFIG -> "kafka.docker2:9092",
     ProducerConfig.LINGER_MS_CONFIG -> "100",
     ProducerConfig.BATCH_SIZE_CONFIG -> "16384"
   )
@@ -42,13 +42,12 @@ object ExampleClientProducer {
     step3
   }
 
-  def main(args: Array[String]): Unit = {
     def timedProgram(producer: Producer) = for {
       _ <- Console.println("starting kafka publishing")
-      start <- Clock.now
+      stopWatch <- Clock.stopwatch
       _ <- publishUsingStream(producer)
-      end <- Clock.now
-      _ <- Console.println(s"Took ${end.toEpochMilli() - start.toEpochMilli()}ms to publish $NumMessages messages")
+      elapsed <- stopWatch.elapsed
+      _ <- Console.println(s"Took ${elapsed.toMillis}ms to publish $NumMessages messages")
     } yield ()
 
     val programLoop: Unit < (Async & Abort[Throwable] & Resource) = for {
@@ -58,6 +57,5 @@ object ExampleClientProducer {
       _ <- timedProgram(producer)
       _ <- timedProgram(producer)
     } yield ()
-    KyoApp.run(programLoop)
-  }
+  run(programLoop)
 }

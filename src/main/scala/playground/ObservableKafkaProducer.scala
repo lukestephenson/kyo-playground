@@ -3,16 +3,13 @@ package playground
 import cats.effect.ExitCode
 import monix.eval.{Task, TaskApp}
 import monix.reactive.{Observable, OverflowStrategy}
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.*
 import org.apache.kafka.common.serialization.StringSerializer
 
-import scala.concurrent.Promise
+import scala.concurrent.{Promise, blocking}
 import scala.jdk.CollectionConverters
 import scala.jdk.CollectionConverters.MapHasAsJava
-import scala.util.{Failure, Success, Try}
-import scala.concurrent.duration.*
-import scala.jdk.javaapi.FutureConverters
-import scala.concurrent.{Promise, blocking}
+import scala.util.{Failure, Success}
 
 object ObservableKafkaProducer extends TaskApp {
   val NumMessages = 10_000_000

@@ -4,15 +4,15 @@ import kyo.*
 
 object Error {
 
-  private def sendEmail(email: String, body: String): Unit < IO = println(s"hello $email")
+  private def sendEmail(email: String, body: String): Unit < IO = println(s"hello $email - $body")
 
-  private val maybeEmail: Maybe[String] = Maybe.Defined("luke@gmail.com")
+  private val maybeEmail: Maybe[String] = Present("luke@gmail.com")
 
-  maybeEmail match{
-    case Maybe.Defined(email) =>
+  val result:  Unit < IO = maybeEmail match{
+    case Present(email) =>
       val body = s"Sent to $email"
       sendEmail(email, body)
-    case Maybe.Empty => ()
+    case Absent => ()
   }
   
   def program: Int < (IO & Abort[String]) = {
@@ -26,7 +26,8 @@ object Error {
   def main(args: Array[String]): Unit = {
     val progVal = program
     val handleErrors: Result[String, Int] < IO = Abort.run[String](progVal)
-    val result: Result[String, Int] = KyoApp.run(handleErrors)
+    import AllowUnsafe.embrace.danger
+    val result: Result[String, Int] = KyoApp.Unsafe.run(handleErrors)
 
     // outside kyo app
     println(result)

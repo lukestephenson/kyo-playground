@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.ByteArraySerializer
 import java.util
 import java.util.Map as JMap
 import java.util.concurrent.atomic.AtomicLong as JAtomicLong
+import scala.collection.immutable.ArraySeq
 import scala.jdk.CollectionConverters
 import scala.jdk.CollectionConverters.MapHasAsJava
 import scala.util.control.NonFatal
@@ -41,13 +42,12 @@ object Producer {
   }
 
   def makeDieInvalidConfig(producerConfig: Map[String, String]): Producer < (Resource & IO) = {
-    val foo: Result[InvalidConfig, Producer] < (Resource & IO) = Abort.run[InvalidConfig](make(producerConfig))
-
     // TODO if the kafka producer fails to instantiate, this results in a scala.MatchError: Panic(org.apache.kafka.common.KafkaException: Failed to construct kafka producer) here
-    foo.map {
-      case Result.Success(liveProducer) => liveProducer
-      case Result.Fail(InvalidConfig.IllegalConfigKey(key)) => throw new IllegalArgumentException(s"Invalid config key: $key")
-    }
+    for {
+      result <- Abort.run[InvalidConfig](make(producerConfig))
+    } yield result match
+        case Result.Success(liveProducer) => liveProducer
+        case Result.Fail(InvalidConfig.IllegalConfigKey(key)) => throw new IllegalArgumentException(s"Invalid config key: $key")
   }
 }
 
@@ -75,6 +75,7 @@ class LiveProducer(producer: KafkaProducer[Array[Byte], Array[Byte]]) extends Pr
   }
 
   override def produceChunkAsyncWithFailures(chunk: Chunk[ProducerRecord[Array[Byte], Array[Byte]]]): BrokerAckWithFailures < IO = {
+    import AllowUnsafe.embrace.danger
     for {
       serverAck <- Promise.init[Nothing, Chunk.Indexed[Result[Throwable, RecordMetadata]]]
       _ <- IO {
@@ -95,7 +96,7 @@ class LiveProducer(producer: KafkaProducer[Array[Byte], Array[Byte]]) extends Pr
               res(resultIndex) = result
 
               if (count.incrementAndGet == length) {
-                IO.run(serverAck.complete(Result.Success(Chunk.from(res))))
+                IO.Unsafe.run(serverAck.complete(Result.Success(Chunk.from(ArraySeq.unsafeWrapArray(res))))).as(()).eval
               }
             )
 
@@ -103,7 +104,7 @@ class LiveProducer(producer: KafkaProducer[Array[Byte], Array[Byte]]) extends Pr
           }
         } catch {
           case NonFatal(err) =>
-            IO.run(serverAck.complete(Result.Success(Chunk.fill(length)(Result.fail(err)).toIndexed)))
+            IO.Unsafe.run(serverAck.complete(Result.Success(Chunk.fill(length)(Result.fail(err)).toIndexed))).as(()).eval
         }
       }
     } yield BrokerAckWithFailures(serverAck.get)

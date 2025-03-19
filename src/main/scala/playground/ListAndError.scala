@@ -1,6 +1,7 @@
 package playground
 
 import kyo.*
+import kyo.AllowUnsafe.embrace.danger
 
 object ListAndError {
   def main(args: Array[String]): Unit = {
@@ -22,7 +23,7 @@ object ListAndError {
 
       val choiceResult = Choice.run(noErrors)
 
-      println(KyoApp.run(choiceResult))
+      println(KyoApp.Unsafe.run(choiceResult))
     }
     println()
     println()
@@ -35,7 +36,7 @@ object ListAndError {
       val noErrors: Unit < IO = Abort.run[String](choiceResult).flatMap { (result: Result[String, Seq[Int]]) =>
         Console.println(s"Abort result is $result") }
 
-      println(KyoApp.run(noErrors))
+      println(KyoApp.Unsafe.run(noErrors))
     }
     ()
   }
