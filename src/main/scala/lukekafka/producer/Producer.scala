@@ -7,7 +7,6 @@ import org.apache.kafka.common.serialization.ByteArraySerializer
 import java.util
 import java.util.Map as JMap
 import java.util.concurrent.atomic.AtomicLong as JAtomicLong
-import scala.collection.immutable.ArraySeq
 import scala.jdk.CollectionConverters
 import scala.jdk.CollectionConverters.MapHasAsJava
 import scala.util.control.NonFatal
@@ -55,19 +54,23 @@ class LiveProducer(producer: KafkaProducer[Array[Byte], Array[Byte]]) extends Pr
 
   override def produceChunkAsync(chunk: Chunk[ProducerRecord[Array[Byte], Array[Byte]]]): BrokerAck < IO = {
     produceChunkAsyncWithFailures(chunk).map { brokerAck =>
-      val errorOrResults = brokerAck.recordMetadata.map { resultChunk =>
-        val empty: Result[Throwable, Chunk[RecordMetadata]] = Result.Success(Chunk.empty)
+      val errorOrResults: Chunk.Indexed[RecordMetadata] < (Async & Abort[Throwable]) = brokerAck.recordMetadata.map { resultChunk =>
 
-        // TODO inefficient
-        resultChunk.foldLeft(empty) { (acc, result) =>
-          acc.flatMap { accChunk =>
-            result.map { metadata =>
-              accChunk.append(metadata)
-            }
-          }
-        } match {
-          case Result.Fail(err) => Abort.fail(err)
-          case Result.Success(chunk) => chunk.toIndexed
+        var i = 0
+        val results = new Array[RecordMetadata](chunk.length)
+        var failure: Result[Throwable, RecordMetadata] = null
+        while (i < chunk.length && failure == null) {
+          val result = resultChunk(i)
+          if (result.isSuccess)
+            results(i) = result.getOrThrow
+          else failure = result
+          i += 1
+        }
+
+        if (failure != null) {
+          Abort.error(failure.error.get)
+        } else {
+          ChunkExtensions.fromArrayNoCopy(results)
         }
       }
       BrokerAck(errorOrResults)
@@ -79,7 +82,7 @@ class LiveProducer(producer: KafkaProducer[Array[Byte], Array[Byte]]) extends Pr
     for {
       serverAck <- Promise.init[Nothing, Chunk.Indexed[Result[Throwable, RecordMetadata]]]
       _ <- IO {
-        val length = chunk.size
+        val length = chunk.length
         try {
           val res = new Array[Result[Throwable, RecordMetadata]](length)
           val count = new JAtomicLong(0)
