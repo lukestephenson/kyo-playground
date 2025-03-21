@@ -4,18 +4,20 @@ import kyo.*
 import lukekafka.producer.{BrokerAck, Producer}
 import org.apache.kafka.clients.producer.{ProducerConfig, ProducerRecord, RecordMetadata}
 
+import java.io.IOException
+
 object ExampleClientProducer extends KyoApp {
   val chunkSize = 10000
   val NumMessages = 10_000_000
 
   val producerConfig = Map(
-    ProducerConfig.BOOTSTRAP_SERVERS_CONFIG -> "kafka.docker2:9092",
+    ProducerConfig.BOOTSTRAP_SERVERS_CONFIG -> "kafka.docker:9092",
     ProducerConfig.LINGER_MS_CONFIG -> "100",
     ProducerConfig.BATCH_SIZE_CONFIG -> "16384"
   )
 
-  val producerBuilder: Producer < (Resource & IO) = for {
-    _ <- Console.println("instantiating kafka producer")
+  val producerBuilder: Producer < (Resource & IO & Abort[IOException]) = for {
+    _ <- Console.printLine("instantiating kafka producer")
     errorOrProducer <- Producer.makeDieInvalidConfig(producerConfig)
   } yield errorOrProducer
 
@@ -36,18 +38,15 @@ object ExampleClientProducer extends KyoApp {
       brokerAck.recordMetadata
     }
 
-    // TODO change to runDiscard when https://github.com/getkyo/kyo/pull/673 is released
-    val step3 = step2.runForeach(_ => ())
-
-    step3
+    step2.runDiscard
   }
 
     def timedProgram(producer: Producer) = for {
-      _ <- Console.println("starting kafka publishing")
+      _ <- Console.printLine("starting kafka publishing")
       stopWatch <- Clock.stopwatch
       _ <- publishUsingStream(producer)
       elapsed <- stopWatch.elapsed
-      _ <- Console.println(s"Took ${elapsed.toMillis}ms to publish $NumMessages messages")
+      _ <- Console.printLine(s"Took ${elapsed.toMillis}ms to publish $NumMessages messages")
     } yield ()
 
     val programLoop: Unit < (Async & Abort[Throwable] & Resource) = for {

@@ -3,6 +3,8 @@ package playground
 import kyo.*
 import kyo.KyoApp
 
+import java.io.IOException
+
 case class InvalidName(name:String)
 
 object AbortExample extends KyoApp {
@@ -14,15 +16,15 @@ object AbortExample extends KyoApp {
     Abort.fail(InvalidName("invalid name"))
   }
   run {
-    val prog: (Int, String) < (Abort[String | InvalidName] & IO) = for {
-      _ <- Console.println("start")
+    val prog: (Int, String) < (Abort[String | InvalidName] & IO & Abort[IOException]) = for {
+      _ <- Console.printLine("start")
       age <- validateAge
       name <- validateName
-      _ <- Console.println("end")
+      _ <- Console.printLine("end")
     } yield (age, name)
 
-    val handleErrors: (Int, String) < (Abort[String] & IO) = Abort.recover[InvalidName] {
-      case InvalidName(name) => Console.println(s"Invalid name: $name").as((0, "invalid"))
+    val handleErrors: (Int, String) < (Abort[String] & IO & Abort[IOException]) = Abort.recover[InvalidName] {
+      case InvalidName(name) => Console.printLine(s"Invalid name: $name").map(_ => (0, "invalid"))
     }(prog)
 
     Abort.run(handleErrors)

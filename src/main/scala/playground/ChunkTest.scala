@@ -5,7 +5,7 @@ import kyo.*
 object ChunkTest {
 
   def main(args: Array[String]): Unit = {
-    val rangeChunk: Chunk.Indexed[Int] = Chunk.from((1 to 10))
+    val rangeChunk: Chunk.Indexed[Int] = Chunk.from((1 to 10).toArray)
     val myChunk: Seq[Int] = rangeChunk.map(_ * 2)
 
 //    val myChunk2: Seq[Int] = myChunk.map(_ * 2)
