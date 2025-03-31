@@ -22,23 +22,20 @@ object ExampleClientProducer extends KyoApp {
   } yield errorOrProducer
 
   def publishUsingStream(kp: Producer): Unit < (Async & Abort[Throwable]) = {
-    val step1: Stream[BrokerAck, IO] = Stream.init(1 to (NumMessages / chunkSize))
+    val step1: Stream[BrokerAck, IO] = Stream.init(1 to (NumMessages / chunkSize), chunkSize = 1)
       .map { index =>
         val baseIndex= index * chunkSize
         val producerRecords: IndexedSeq[ProducerRecord[Array[Byte], Array[Byte]]] = (0 to chunkSize).map { chunkIndex =>
           new ProducerRecord[Array[Byte], Array[Byte]]("escape.heartbeat", s"kyo ${baseIndex + chunkIndex}".getBytes)
         }
-        val result: BrokerAck < IO = kp.produceChunkAsync(Chunk.from(producerRecords))
-        result
+        kp.produceChunkAsync(Chunk.from(producerRecords))
       }
+
       // .buffer(2048) // Note at this point the messages are sent, and we are just waiting on promises to complete
     val step2: Stream[Chunk.Indexed[RecordMetadata], Async & Abort[Throwable]] = step1.map { brokerAck =>
-//      val foo: Chunk.Indexed[RecordMetadata] < (IO & Abort[Throwable]) = Async.run(brokerAck.recordMetadata)
-//      foo
       brokerAck.recordMetadata
     }
-
-    step2.runDiscard
+    step2.discard
   }
 
     def timedProgram(producer: Producer) = for {

@@ -7,7 +7,6 @@ import org.apache.kafka.common.serialization.ByteArraySerializer
 import java.util
 import java.util.Map as JMap
 import java.util.concurrent.atomic.AtomicLong as JAtomicLong
-import scala.collection.immutable.ArraySeq
 import scala.jdk.CollectionConverters
 import scala.jdk.CollectionConverters.MapHasAsJava
 import scala.util.control.NonFatal
