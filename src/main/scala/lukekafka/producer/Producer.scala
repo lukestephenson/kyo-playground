@@ -66,7 +66,7 @@ class LiveProducer(producer: KafkaProducer[Array[Byte], Array[Byte]]) extends Pr
             }
           }
         } match {
-          case Result.Fail(err) => Abort.fail(err)
+          case Result.Error(err) => Abort.fail(err)
           case Result.Success(chunk) => chunk.toIndexed
         }
       }
